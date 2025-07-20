@@ -1,0 +1,73 @@
+package com.example.searchapi.service;
+
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import com.example.searchapi.model.CachedQuery;
+import com.example.searchapi.model.SearchResult;
+import com.example.searchapi.repository.CachedQueryRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+@Service
+public class SearchService {
+	private final CachedQueryRepository repo;
+	  private static final String SEARCH_URL = "https://api.contextualwebsearch.com/api/Search/WebSearchAPI";
+
+	  @Value("${contextualweb.api.key}") private String apiKey;
+
+	  public SearchService(CachedQueryRepository repo) { this.repo = repo; }
+
+	  public List<SearchResult> search(String query) {
+		    var cached = repo.findByQuery(query);
+		    if (cached.isPresent()) return cached.get().getResults();
+
+		    List<SearchResult> results = new ArrayList<>();
+		    try {
+		        String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8.toString());
+		        var url = SEARCH_URL + "?q=" + encoded + "&pageNumber=1&pageSize=10&autoCorrect=true";
+		        
+		        var req = HttpRequest.newBuilder()
+		            .uri(URI.create(url))
+		            .header("x-api-key", apiKey)
+		            .GET()
+		            .build();
+		        
+		        var resp = HttpClient.newHttpClient().send(req, HttpResponse.BodyHandlers.ofString());
+		        JsonNode arr = new ObjectMapper().readTree(resp.body()).get("value");
+
+		        if (arr != null) {
+		            arr.forEach(item -> {
+		                var r = new SearchResult();
+		                r.setTitle(item.get("title").asText());
+		                r.setUrl(item.get("url").asText());
+		                r.setDescription(item.get("description").asText());
+		                results.add(r);
+		            });
+		        }
+
+		        var cq = new CachedQuery();
+		        cq.setQuery(query);
+		        cq.setResults(results);
+		        cq.setCreatedAt(new Date());
+		        repo.save(cq);
+
+		    } catch (Exception e) {
+		        e.printStackTrace();
+		    }
+
+		    return results;
+		}
+
+
+}

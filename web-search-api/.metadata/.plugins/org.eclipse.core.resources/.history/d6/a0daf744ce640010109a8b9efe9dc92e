@@ -1,0 +1,5 @@
+spring.application.name=spring-api
+server.port=8080
+spring.data.mongodb.uri=mongodb://localhost:27017/searchdb
+spring.data.mongodb.database=searchdb
+contextualweb.api.key=eadb21f469b8e562b1475070b2d7d2173fa46e7513c92d069131d50d70a44c1f

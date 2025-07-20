@@ -1,0 +1,80 @@
+package com.example.searchapi.service;
+
+import com.example.searchapi.model.CachedQuery;
+import com.example.searchapi.model.SearchResult;
+import com.example.searchapi.repository.CachedQueryRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+
+@Service
+public class SearchService {
+
+    private final CachedQueryRepository repo;
+
+    @Value("${serpapi.api.key}")
+    private String apiKey;
+
+    private static final String SEARCH_URL = "https://serpapi.com/search";
+
+    public SearchService(CachedQueryRepository repo) {
+        this.repo = repo;
+    }
+
+    public List<SearchResult> search(String query) {
+        var cached = repo.findByQuery(query);
+        if (cached.isPresent()) {
+        	System.out.println("CACHE HIT for query:" + query);
+            return cached.get().getResults();
+        }
+        
+        System.out.println("CACHE MISS — Calling SerpAPI for query: " + query);
+
+        List<SearchResult> results = new ArrayList<>();
+        try {
+            String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
+            String url = SEARCH_URL + "?q=" + encoded + "&engine=google&api_key=" + apiKey;
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+            JsonNode json = new ObjectMapper().readTree(response.body());
+            JsonNode organicResults = json.get("organic_results");
+
+            if (organicResults != null) {
+                for (JsonNode item : organicResults) {
+                    SearchResult r = new SearchResult();
+                    r.setTitle(item.get("title").asText());
+                    r.setUrl(item.get("link").asText());
+                    r.setDescription(item.has("snippet") ? item.get("snippet").asText() : "");
+                    results.add(r);
+                }
+            }
+
+            CachedQuery cq = new CachedQuery();
+            cq.setQuery(query);
+            cq.setResults(results);
+            cq.setCreatedAt(new Date());
+            repo.save(cq);
+            
+            System.out.println("✅ Cached new results for query: " + query);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return results;
+    }
+}
