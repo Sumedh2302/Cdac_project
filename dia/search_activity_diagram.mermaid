@@ -1,0 +1,95 @@
+flowchart TD
+    Start([User initiates search]) --> Input[Receive search query and pagination params]
+    Input --> Cache{Check cache for query}
+    
+    Cache -->|Cache Hit| CacheFound[Retrieve cached results]
+    CacheFound --> Paginate[Apply pagination to cached results]
+    Paginate --> Return[Return paginated results]
+    Return --> End([End])
+    
+    Cache -->|Cache Miss| ParallelStart[Initialize parallel search execution]
+    
+    ParallelStart --> Parallel{Execute parallel API calls}
+    
+    Parallel --> Brave[Call Brave Search API]
+    Parallel --> Google[Call Google Search API] 
+    Parallel --> Serp[Call SerpAPI]
+    Parallel --> DDG[Call DuckDuckGo API]
+    
+    Brave --> BraveResult[Parse Brave response<br/>Create SearchResult objects]
+    Google --> GoogleResult[Parse Google response<br/>Create SearchResult objects]
+    Serp --> SerpResult[Parse SerpAPI response<br/>Create SearchResult objects]
+    DDG --> DDGResult[Parse DDG response<br/>Create SearchResult objects]
+    
+    BraveResult --> Merge[Merge all results into single list]
+    GoogleResult --> Merge
+    SerpResult --> Merge
+    DDGResult --> Merge
+    
+    Merge --> Dedupe[Deduplicate results by URL<br/>Keep first occurrence]
+    Dedupe --> Keywords[Extract keywords from query<br/>Remove stopwords]
+    Keywords --> Score[Calculate relevance scores for each result]
+    
+    Score --> ScoreLoop{For each result}
+    ScoreLoop --> TitleScore[Score based on title matches<br/>+4 for exact word match<br/>+1 for partial match]
+    TitleScore --> DescScore[Score based on description matches<br/>+2 for exact word match<br/>+0.5 for partial match]
+    DescScore --> DomainScore[Apply domain bonuses<br/>+5 for .gov/.edu/.org<br/>-10 for cricketwireless]
+    DomainScore --> NextResult{More results?}
+    NextResult -->|Yes| ScoreLoop
+    NextResult -->|No| Sort[Sort results by score descending]
+    
+    Sort --> SaveCache[Create CachedQuery object<br/>Save to MongoDB]
+    SaveCache --> Paginate
+    
+    %% Error handling paths
+    Brave -->|API Error| BraveError[Log error<br/>Return empty list]
+    Google -->|API Error| GoogleError[Log error<br/>Return empty list]
+    Serp -->|API Error| SerpError[Log error<br/>Return empty list]
+    DDG -->|API Error| DDGError[Log error<br/>Return empty list]
+    
+    BraveError --> Merge
+    GoogleError --> Merge
+    SerpError --> Merge
+    DDGError --> Merge
+    
+    %% Alternative flows
+    subgraph "Image Search Flow"
+        ImageStart([User requests image search]) --> ImageCache{Check image cache}
+        ImageCache -->|Hit| ImageCacheFound[Return cached image results]
+        ImageCache -->|Miss| ImageAPI[Call SerpAPI for images]
+        ImageAPI --> ImageParse[Parse image results<br/>Extract title, thumbnail, source]
+        ImageParse --> ImageSave[Cache image results]
+        ImageSave --> ImageReturn[Return image results]
+        ImageCacheFound --> ImageReturn
+        ImageReturn --> ImageEnd([End])
+    end
+    
+    subgraph "Autocomplete Flow"
+        AutoStart([User types query]) --> AutoAPI[Call DuckDuckGo Autocomplete API]
+        AutoAPI --> AutoParse[Parse suggestions]
+        AutoParse --> AutoReturn[Return suggestions JSON]
+        AutoReturn --> AutoEnd([End])
+    end
+    
+    subgraph "Instant Answer Flow"
+        InstantStart([User requests instant answer]) --> InstantAPI[Call DuckDuckGo Instant API]
+        InstantAPI --> InstantFilter[Filter response<br/>Extract AbstractText, Answer, Heading]
+        InstantFilter --> InstantCheck{Has useful content?}
+        InstantCheck -->|Yes| InstantReturn[Return filtered JSON]
+        InstantCheck -->|No| InstantEmpty[Return 204 No Content]
+        InstantReturn --> InstantEnd([End])
+        InstantEmpty --> InstantEnd
+    end
+    
+    %% Styling
+    classDef startEnd fill:#c8e6c9
+    classDef process fill:#e3f2fd
+    classDef decision fill:#fff3e0
+    classDef error fill:#ffebee
+    classDef cache fill:#f3e5f5
+    
+    class Start,End,ImageStart,ImageEnd,AutoStart,AutoEnd,InstantStart,InstantEnd startEnd
+    class Input,ParallelStart,Brave,Google,Serp,DDG,BraveResult,GoogleResult,SerpResult,DDGResult,Merge,Dedupe,Keywords,Score,TitleScore,DescScore,DomainScore,Sort,SaveCache,Paginate,Return process
+    class Cache,ScoreLoop,NextResult,ImageCache,InstantCheck decision
+    class BraveError,GoogleError,SerpError,DDGError error
+    class CacheFound,ImageCacheFound cache

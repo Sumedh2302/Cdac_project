@@ -1,0 +1,75 @@
+graph TB
+    subgraph "MongoDB Database: searchapi"
+        
+        subgraph "Collection: cached_queries"
+            CQ["📄 cached_queries<br/>@Document(collection = 'cached_queries')"]
+            CQ_FIELDS["🔑 _id: ObjectId (PK)<br/>📝 query: String<br/>📋 results: List&lt;SearchResult&gt;<br/>📅 createdAt: Date<br/><br/>🔍 Index: { query: 1 }<br/>⏰ TTL Index: { createdAt: 1 }"]
+            CQ --> CQ_FIELDS
+        end
+        
+        subgraph "Collection: cached_image_query"
+            CIQ["📄 cached_image_query<br/>@Document(collection = 'cached_image_query')"]  
+            CIQ_FIELDS["🔑 _id: ObjectId (PK)<br/>📝 query: String<br/>📋 results: List&lt;ImageSearchResult&gt;<br/>📅 createdAt: Date<br/><br/>🔍 Index: { query: 1 }<br/>⏰ TTL Index: { createdAt: 1 }"]
+            CIQ --> CIQ_FIELDS
+        end
+        
+        subgraph "Collection: search_results"
+            SR["📄 search_results<br/>@Document(collection = 'search_results')"]
+            SR_FIELDS["🔑 _id: ObjectId (PK)<br/>📝 query: String<br/>📝 title: String<br/>🔗 url: String<br/>📝 description: String<br/>📝 source: String<br/>🔢 originalRank: int<br/>⭐ score: double<br/><br/>🔍 Indexes:<br/>{ query: 1 }<br/>{ url: 1 }<br/>{ score: -1 }"]
+            SR --> SR_FIELDS
+        end
+        
+        subgraph "Embedded Document Schema"
+            
+            subgraph "SearchResult (Embedded in cached_queries)"
+                ESR["SearchResult {<br/>📝 query: String<br/>📝 title: String<br/>🔗 url: String<br/>📝 description: String<br/>📝 source: String<br/>🔢 originalRank: int<br/>⭐ score: double<br/>}"]
+            end
+            
+            subgraph "ImageSearchResult (Embedded in cached_image_query)"
+                EISR["ImageSearchResult {<br/>📝 title: String<br/>🖼️ imgUrl: String<br/>📝 source: String<br/>}"]
+            end
+        end
+        
+        subgraph "Spring Data Repositories"
+            REPO1["CachedQueryRepository<br/>extends MongoRepository&lt;CachedQuery, String&gt;<br/><br/>Methods:<br/>• findByQuery(String query): Optional&lt;CachedQuery&gt;<br/>• save(CachedQuery): CachedQuery<br/>• findAll(): List&lt;CachedQuery&gt;"]
+            
+            REPO2["CachedImageQueryRepository<br/>extends MongoRepository&lt;CachedImageQuery, String&gt;<br/><br/>Methods:<br/>• findByQuery(String query): Optional&lt;CachedImageQuery&gt;<br/>• save(CachedImageQuery): CachedImageQuery<br/>• findAll(): List&lt;CachedImageQuery&gt;"]
+        end
+        
+        subgraph "Data Types & Constraints"
+            CONSTRAINTS["📋 Data Types:<br/>• ObjectId: MongoDB primary key<br/>• String: Text fields (indexed for search)<br/>• Date: Timestamp fields<br/>• int: Numeric ranking<br/>• double: Scoring values<br/>• List&lt;T&gt;: Embedded document arrays<br/><br/>🔒 Constraints:<br/>• @Id: Primary key annotation<br/>• @Document: Collection mapping<br/>• Lombok @Getter/@Setter: Auto-generated accessors"]
+        end
+    end
+    
+    subgraph "External Dependencies"
+        SPRING["🍁 Spring Data MongoDB<br/>• Auto-configuration<br/>• Repository pattern<br/>• Query method generation"]
+        LOMBOK["🌶️ Lombok<br/>• @Getter/@Setter<br/>• Reduces boilerplate code"]
+        JACKSON["🔄 Jackson<br/>• JSON serialization<br/>• HTTP response mapping"]
+    end
+    
+    %% Connections
+    CQ_FIELDS -.->|embeds| ESR
+    CIQ_FIELDS -.->|embeds| EISR
+    
+    REPO1 -.->|manages| CQ
+    REPO2 -.->|manages| CIQ
+    
+    CQ -.->|uses| SPRING
+    CIQ -.->|uses| SPRING
+    SR -.->|uses| SPRING
+    
+    ESR -.->|serialized by| JACKSON
+    EISR -.->|serialized by| JACKSON
+    
+    %% Styling
+    classDef collection fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef embedded fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px  
+    classDef repository fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    classDef constraint fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef external fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    
+    class CQ,CIQ,SR collection
+    class ESR,EISR embedded
+    class REPO1,REPO2 repository
+    class CONSTRAINTS,CQ_FIELDS,CIQ_FIELDS,SR_FIELDS constraint
+    class SPRING,LOMBOK,JACKSON external

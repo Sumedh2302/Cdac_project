@@ -1,0 +1,158 @@
+classDiagram
+    %% Model Classes
+    class SearchResult {
+        -String id
+        -String query
+        -String title
+        -String url
+        -String description
+        -String source
+        -int originalRank
+        -double score
+        +getters/setters()
+    }
+    
+    class ImageSearchResult {
+        -String title
+        -String imgUrl
+        -String source
+        +getters/setters()
+    }
+    
+    class CachedQuery {
+        -String id
+        -String query
+        -List~SearchResult~ results
+        -Date createdAt
+        +getters/setters()
+    }
+    
+    class CachedImageQuery {
+        -String id
+        -String query
+        -List~ImageSearchResult~ results
+        -Date createdAt
+        +getters/setters()
+    }
+    
+    class Suggestions {
+        -String word
+        +getters/setters()
+    }
+
+    %% Repository Interfaces
+    class CachedQueryRepository {
+        <<interface>>
+        +findByQuery(String query) Optional~CachedQuery~
+        +save(CachedQuery query) CachedQuery
+        +findAll() List~CachedQuery~
+    }
+    
+    class CachedImageQueryRepository {
+        <<interface>>
+        +findByQuery(String query) Optional~CachedImageQuery~
+        +save(CachedImageQuery query) CachedImageQuery
+        +findAll() List~CachedImageQuery~
+    }
+
+    %% Service Interface
+    class ISearchProvider {
+        <<interface>>
+        +search(String query) List~SearchResult~
+    }
+
+    %% Service Implementations
+    class SearchService {
+        -CachedQueryRepository repo
+        -List~ISearchProvider~ searchProviders
+        -Set~String~ stopwords
+        +search(String query, int page, int size) List~SearchResult~
+        -extractKeywords(String query) List~String~
+    }
+    
+    class BraveApiSearchService {
+        -String braveApiKey
+        -String braveApiUrl
+        +search(String query) List~SearchResult~
+    }
+    
+    class GoogleSerachService {
+        -String googleApiKey
+        -String googleCx
+        +search(String query) List~SearchResult~
+    }
+    
+    class SerpApiSearchService {
+        -String apiKey
+        +search(String query) List~SearchResult~
+    }
+    
+    class DDFullApiSearchService {
+        -String ddgApiKey
+        +search(String query) List~SearchResult~
+    }
+    
+    class AutoCompleteService {
+        +getSuggestion(String query) String
+    }
+    
+    class DDInstantApiSearchService {
+        +getInstantAnswer(String query) String
+    }
+    
+    class ImageSearchServiceApi {
+        -CachedImageQueryRepository cachedImageQueryRepository
+        -String apiKey
+        +searchImages(String query) List~ImageSearchResult~
+    }
+
+    %% Controller
+    class SearchController {
+        -SearchService service
+        -ImageSearchServiceApi imageSearchServiceApi
+        -AutoCompleteService autoCompleteService
+        -DDInstantApiSearchService ddInstantApiSearchService
+        +search(String query, int page, int pageSize) List~SearchResult~
+        +autoComplete(String query) ResponseEntity~String~
+        +getInstantAnswer(String query) ResponseEntity~String~
+        +searchImages(String query) List~ImageSearchResult~
+    }
+
+    %% Relationships
+    SearchController --> SearchService : uses
+    SearchController --> ImageSearchServiceApi : uses
+    SearchController --> AutoCompleteService : uses
+    SearchController --> DDInstantApiSearchService : uses
+    
+    SearchService --> CachedQueryRepository : uses
+    SearchService --> ISearchProvider : uses
+    
+    ImageSearchServiceApi --> CachedImageQueryRepository : uses
+    ImageSearchServiceApi --> ImageSearchResult : creates
+    
+    BraveApiSearchService ..|> ISearchProvider : implements
+    GoogleSerachService ..|> ISearchProvider : implements
+    SerpApiSearchService ..|> ISearchProvider : implements
+    DDFullApiSearchService ..|> ISearchProvider : implements
+    
+    CachedQueryRepository --> CachedQuery : manages
+    CachedImageQueryRepository --> CachedImageQuery : manages
+    
+    CachedQuery --> SearchResult : contains
+    CachedImageQuery --> ImageSearchResult : contains
+    
+    SearchService --> SearchResult : creates
+    ISearchProvider --> SearchResult : returns
+    
+    %% Spring Annotations
+    note for SearchController "REST Controller\n@CrossOrigin\n@RequestMapping('/api')"
+    note for SearchService "@Service"
+    note for BraveApiSearchService "@Service('braveSearchService')"
+    note for GoogleSerachService "@Service('googleSearchService')"
+    note for SerpApiSearchService "@Service('serpApiSearchService')"
+    note for DDFullApiSearchService "@Service('ddFullSearchService')"
+    note for AutoCompleteService "@Service"
+    note for DDInstantApiSearchService "@Service('ddInstantSearchService')"
+    note for ImageSearchServiceApi "@Service"
+    note for CachedQueryRepository "MongoRepository"
+    note for CachedImageQueryRepository "MongoRepository"

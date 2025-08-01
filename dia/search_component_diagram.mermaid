@@ -1,0 +1,125 @@
+graph TB
+    subgraph "Frontend Layer"
+        RC[React Client<br/>Port: 5173]
+    end
+    
+    subgraph "API Gateway / Load Balancer"
+        LB[Load Balancer<br/>Cross-Origin Support]
+    end
+    
+    subgraph "Spring Boot Application"
+        subgraph "Controller Layer"
+            SC[SearchController<br/>@RestController<br/>@CrossOrigin]
+        end
+        
+        subgraph "Service Layer"
+            SS[SearchService<br/>@Service<br/>Main Orchestrator]
+            ACS[AutoCompleteService<br/>@Service]
+            DDIS[DDInstantApiSearchService<br/>@Service]
+            ISA[ImageSearchServiceApi<br/>@Service]
+        end
+        
+        subgraph "Search Provider Layer"
+            SP[ISearchProvider<br/><<interface>>]
+            BAS[BraveApiSearchService<br/>@Service]
+            GS[GoogleSearchService<br/>@Service]
+            SAS[SerpApiSearchService<br/>@Service]
+            DFS[DDFullApiSearchService<br/>@Service]
+        end
+        
+        subgraph "Repository Layer"
+            CQR[CachedQueryRepository<br/>MongoRepository]
+            CIQR[CachedImageQueryRepository<br/>MongoRepository]
+        end
+        
+        subgraph "Model Layer"
+            SR[SearchResult]
+            ISR[ImageSearchResult]
+            CQ[CachedQuery]
+            CIQ[CachedImageQuery]
+            SUG[Suggestions]
+        end
+    end
+    
+    subgraph "Database Layer"
+        MONGO[(MongoDB<br/>Collections:<br/>- cached_queries<br/>- cached_image_query<br/>- search_results)]
+    end
+    
+    subgraph "External APIs"
+        BRAVE[Brave Search API<br/>brave.com]
+        GOOGLE[Google Custom Search<br/>googleapis.com]
+        SERPAPI[SerpAPI<br/>serpapi.com]
+        DDG[DuckDuckGo API<br/>api.duckduckgo.com]
+        DDGAC[DuckDuckGo Autocomplete<br/>duckduckgo.com/ac]
+    end
+    
+    subgraph "Configuration"
+        PROPS[application.properties<br/>- API Keys<br/>- Database Config<br/>- CORS Settings]
+    end
+    
+    %% Frontend connections
+    RC -->|HTTP Requests<br/>Port: 5173 → 8080| LB
+    LB --> SC
+    
+    %% Controller to Service connections
+    SC --> SS
+    SC --> ACS
+    SC --> DDIS
+    SC --> ISA
+    
+    %% Service Layer connections
+    SS --> SP
+    SS --> CQR
+    ISA --> CIQR
+    
+    %% Search Provider implementations
+    BAS -.->|implements| SP
+    GS -.->|implements| SP
+    SAS -.->|implements| SP
+    DFS -.->|implements| SP
+    
+    %% Repository to Database
+    CQR --> MONGO
+    CIQR --> MONGO
+    
+    %% Model relationships
+    CQR -.-> CQ
+    CIQR -.-> CIQ
+    SS -.-> SR
+    ISA -.-> ISR
+    ACS -.-> SUG
+    
+    %% External API connections
+    BAS -->|HTTPS| BRAVE
+    GS -->|HTTPS| GOOGLE
+    SAS -->|HTTPS| SERPAPI
+    DFS -->|HTTPS| SERPAPI
+    DDIS -->|HTTPS| DDG
+    ACS -->|HTTPS| DDGAC
+    ISA -->|HTTPS| SERPAPI
+    
+    %% Configuration
+    PROPS -.-> SC
+    PROPS -.-> SS
+    PROPS -.-> BAS
+    PROPS -.-> GS
+    PROPS -.-> SAS
+    PROPS -.-> DFS
+    PROPS -.-> ISA
+    
+    %% Styling
+    classDef frontend fill:#e1f5fe
+    classDef controller fill:#f3e5f5
+    classDef service fill:#e8f5e8
+    classDef repository fill:#fff3e0
+    classDef database fill:#fce4ec
+    classDef external fill:#f1f8e9
+    classDef config fill:#f9fbe7
+    
+    class RC frontend
+    class SC controller
+    class SS,ACS,DDIS,ISA,SP,BAS,GS,SAS,DFS service
+    class CQR,CIQR repository
+    class MONGO database
+    class BRAVE,GOOGLE,SERPAPI,DDG,DDGAC external
+    class PROPS config

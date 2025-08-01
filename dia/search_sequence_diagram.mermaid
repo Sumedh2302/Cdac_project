@@ -1,0 +1,72 @@
+sequenceDiagram
+    participant Client as React Client
+    participant Controller as SearchController
+    participant Service as SearchService
+    participant Cache as CachedQueryRepository
+    participant Brave as BraveApiSearchService
+    participant Google as GoogleSearchService
+    participant Serp as SerpApiSearchService
+    participant DDG as DDFullApiSearchService
+    participant MongoDB as MongoDB
+
+    Client->>+Controller: GET /api/search?query="java spring"&page=0&pageSize=10
+    Controller->>+Service: search("java spring", 0, 10)
+    
+    Service->>+Cache: findByQuery("java spring")
+    Cache->>+MongoDB: Query cached_queries collection
+    MongoDB-->>-Cache: Optional<CachedQuery>
+    Cache-->>-Service: Optional.empty() (Cache Miss)
+    
+    Note over Service: Cache Miss - Execute parallel search
+    
+    par Parallel API Calls
+        Service->>+Brave: search("java spring")
+        Brave->>Brave: Build HTTP request to Brave API
+        Brave-->>-Service: List<SearchResult>
+    and
+        Service->>+Google: search("java spring")
+        Google->>Google: Build HTTP request to Google API
+        Google-->>-Service: List<SearchResult>
+    and
+        Service->>+Serp: search("java spring")
+        Serp->>Serp: Build HTTP request to SerpAPI
+        Serp-->>-Service: List<SearchResult>
+    and
+        Service->>+DDG: search("java spring")
+        DDG->>DDG: Build HTTP request to DDG API
+        DDG-->>-Service: List<SearchResult>
+    end
+    
+    Note over Service: Combine and process results
+    Service->>Service: Merge all results into List<SearchResult>
+    Service->>Service: Deduplicate by URL
+    Service->>Service: Extract keywords from query
+    Service->>Service: Calculate relevance scores
+    Service->>Service: Sort by score (descending)
+    
+    Note over Service: Cache the results
+    Service->>Service: Create CachedQuery object
+    Service->>+Cache: save(cachedQuery)
+    Cache->>+MongoDB: Insert into cached_queries collection
+    MongoDB-->>-Cache: Saved CachedQuery
+    Cache-->>-Service: CachedQuery
+    
+    Note over Service: Apply pagination
+    Service->>Service: Apply pagination (page=0, size=10)
+    Service-->>-Controller: List<SearchResult> (paginated)
+    
+    Controller-->>-Client: JSON Response with search results
+
+    Note over Client,MongoDB: Alternative Flow - Cache Hit
+    
+    Client->>+Controller: GET /api/search?query="java spring"&page=1&pageSize=10
+    Controller->>+Service: search("java spring", 1, 10)
+    Service->>+Cache: findByQuery("java spring")
+    Cache->>+MongoDB: Query cached_queries collection
+    MongoDB-->>-Cache: Optional<CachedQuery> (found)
+    Cache-->>-Service: CachedQuery with results
+    
+    Note over Service: Cache Hit - Skip API calls
+    Service->>Service: Apply pagination to cached results
+    Service-->>-Controller: List<SearchResult> (paginated)
+    Controller-->>-Client: JSON Response with cached results

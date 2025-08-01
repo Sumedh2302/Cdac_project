@@ -1,0 +1,71 @@
+erDiagram
+    CACHED_QUERIES {
+        ObjectId _id PK "MongoDB ObjectId"
+        string query "Search query string"
+        array results "Array of SearchResult objects"
+        datetime createdAt "Cache creation timestamp"
+    }
+    
+    SEARCH_RESULTS {
+        ObjectId _id PK "MongoDB ObjectId"
+        string query "Original search query"
+        string title "Result title"
+        string url "Result URL"
+        string description "Result description/snippet"
+        string source "Search provider (Brave, Google, etc.)"
+        int originalRank "Position in original API response"
+        double score "Calculated relevance score"
+    }
+    
+    CACHED_IMAGE_QUERIES {
+        ObjectId _id PK "MongoDB ObjectId"
+        string query "Image search query"
+        array results "Array of ImageSearchResult objects"
+        datetime createdAt "Cache creation timestamp"
+    }
+    
+    IMAGE_SEARCH_RESULTS {
+        string title "Image title/alt text"
+        string imgUrl "Image thumbnail URL"
+        string source "Image source/origin"
+    }
+    
+    %% Embedded relationships in MongoDB
+    CACHED_QUERIES ||--o{ SEARCH_RESULTS : "embeds results array"
+    CACHED_IMAGE_QUERIES ||--o{ IMAGE_SEARCH_RESULTS : "embeds results array"
+    
+    %% Additional collections that might exist
+    SEARCH_ANALYTICS {
+        ObjectId _id PK "MongoDB ObjectId"
+        string query "Search query"
+        string userAgent "User browser info"
+        string ipAddress "User IP (hashed for privacy)"
+        datetime timestamp "Search timestamp"
+        int resultsCount "Number of results returned"
+        array providers "Which search providers were used"
+        double responseTime "API response time in ms"
+    }
+    
+    USER_SESSIONS {
+        ObjectId _id PK "MongoDB ObjectId"
+        string sessionId "Unique session identifier"
+        datetime startTime "Session start time"
+        datetime lastActivity "Last user activity"
+        array searchHistory "List of search queries in session"
+        string userAgent "Browser information"
+    }
+    
+    API_USAGE_LOGS {
+        ObjectId _id PK "MongoDB ObjectId"
+        string provider "API provider name"
+        string endpoint "API endpoint called"
+        datetime timestamp "Request timestamp"
+        int statusCode "HTTP response code"
+        double responseTime "Response time in ms"
+        string query "Search query (for context)"
+        boolean fromCache "Whether result was cached"
+    }
+    
+    %% Potential relationships for analytics
+    SEARCH_ANALYTICS }o--|| USER_SESSIONS : "belongs to session"
+    API_USAGE_LOGS }o--o| CACHED_QUERIES : "may relate to cached query"
